@@ -77,11 +77,14 @@ public class Interpreter {
                     if(tokens.length > 2) throw new UnexpectedTokenException(this.line, operand);
                     this.decrement(operand);
                 }
-                // while
-                if(statement.equals(statements.get(3))) {
+                // while and if
+                if((statement.equals(statements.get(3)) || statement.equals(statements.get(4)))) {
                     if(!status.containsKey(operand)) throw new UndefinedException(this.line, operand);
                     if(tokens.length < 5) throw new SyntaxError(this.line);
                     if(tokens.length > 5) throw new UnexpectedTokenException(this.line, tokens[5]);
+                }
+                // while
+                if(statement.equals(statements.get(3))) {
                     String notToken = tokens[2];
                     if(!notToken.equals(reservedWords.get(0))) throw new UnexpectedTokenException(this.line, notToken); // not
                     String zeroToken = tokens[3];
@@ -91,9 +94,19 @@ public class Interpreter {
                     this.whileDo(operand, this.line + 1);
                 }
                 // if
-                if(statement.equals(statements.get(4))) {}
+                if(statement.equals(statements.get(4))) {
+                    String operator = tokens[2];
+                    if(!comparators.contains(operator)) throw new UnexpectedTokenException(this.line, operator); // = or >
+                    String operand2 = tokens[3];
+                    if(reservedWords.contains(operand2) || statements.contains(operand2)) throw new ReservedTokenException(this.line, operand2); // 2nd operand
+                    String doToken = tokens[4];
+                    if(!doToken.equals(reservedWords.get(1))) throw new UnexpectedTokenException(this.line, doToken); // do
+                    this.ifDo(operand, operator, operand2);
+                }
                 // func
-                if(statement.equals(statements.get(5))) {}
+                if(statement.equals(statements.get(5))) {
+
+                }
                 // print
                 if(statement.equals(statements.get(6))) {
                     if(tokens.length > 2) throw new UnexpectedTokenException(this.line, operand);
@@ -148,8 +161,37 @@ public class Interpreter {
     }
     private void print(String operand) {
         if(this.status.containsKey(operand)) {
-            out.println(operand);
+            out.println(this.status.get(operand));
         } else throw new UndefinedException(this.line, operand);
+    }
+    private void ifDo(String operand1, String operator, String operand2) throws EOFException {
+        ArrayList<String> remaining = new ArrayList<>(this.code.subList(line-1, this.code.size()));
+        Iterator<String> iterator = remaining.iterator();
+        int nestLevel = 1;
+        int endLine = 0;
+        while(iterator.hasNext()) {
+            String next = iterator.next();
+            for(String token : new String[]{statements.get(3), statements.get(4), statements.get(5)}) {
+                if(next.contains(token)) {
+                    nestLevel++;
+                }
+            }
+            if(next.contains(reservedWords.get(2))) nestLevel--;
+            if(nestLevel == 0) break;
+            endLine++;
+            if(!iterator.hasNext()) throw new EOFException("Reached end of file before if block finished");
+        }
+        ArrayList<String> block = new ArrayList<>(remaining.subList(0, endLine));
+        Interpreter i;
+        if(!(comparators.contains(operator))) throw new SyntaxError(this.line);
+        if((operator.equals(comparators.get(0)) && this.status.get(operand1).equals(this.status.get(operand2))) // >
+        || (operator.equals(comparators.get(1)) && this.status.get(operand1).compareTo(this.status.get(operand2)) > 0)) { // >
+            if (!this.status.containsKey(operand1) && this.status.containsKey(operand2))
+                throw new UndefinedException(this.line, "");
+            i = new Interpreter(block, this.status);
+            this.status.putAll(i.status);
+            this.line = line + endLine;
+        }
     }
 
     public static void main(String[] args) throws FileNotFoundException, EOFException {
